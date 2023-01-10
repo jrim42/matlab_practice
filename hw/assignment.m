@@ -10,8 +10,8 @@
 % delimiter
 
 % variables
-%   1.  d_loc1      시도             
-%   2.  d_loc2      도시
+%   1.  d_loc1      시도                         
+%   2.  d_loc2      도시              
 %   3.  d_loc3      시군구            
 %   4.  d_station   측정소명          
 %   5.  d_TMSID     TMSID           
@@ -28,57 +28,52 @@ clear;
 close all;
 
 %% importing data
-filename = fopen('data_2016.txt');
-
-var = textscan(filename, repmat(' %s ', [1 12]), 1, ...
-    'HeaderLines', 0, 'Delimiter', ',', 'ReturnOnError', false);
-% data = textscan(filename, repmat(' %s ', [1 12]), 1, ...
-%     'Delimiter', ',', 'ReturnOnError', false);
-
-data = textscan(filename, [repmat('%s', [1, 6]), repmat('%n', [1, 6])], 1, ...
-    'Delimiter', ',', 'ReturnOnError', false);
-% data = textscan(filename, '%s %s %s %s %s %s %n %n %n %n %n %n', ...
-%     'Delimiter', ',', 'ReturnOnError', false);
-
-fclose(filename); 
-clear filename ans
-
-%% variable name setting
+opts = detectImportOptions('data_2016.txt');
+opts.DataLines = [2, Inf];
+opts.Delimiter = ",";
+opts.VariableNames = ["loc1", "loc2", "loc3", "station", ...
+                      "TMSID", "YYYYMMDDHH", "SO2", "PM10", ...
+                      "O3", "NO2", "CO", "PM2_5"];
+opts.VariableTypes = ["string", "string", "string", "string", ...
+                      "double", "double", "double", "double", ...
+                      "double", "double", "double", "double"];
+t1 = readtable('data_2016.txt', opts);
 
 %% data filtering
+t2 = table(t1.loc1, t1.loc2, t1.loc3, t1.station, t1.TMSID, t1.YYYYMMDDHH, t1.PM10);
+t2.Var1 = categorical(t2.Var1);
+t3 = t2(t2.Var1 == '강원' & t2.Var7 >= 0, :);
+clear t1;
+clear t2;
 
-selected = table(d_loc1, d_loc2, d_loc3, d_station, d_TMSID, d_date, d_PM10);
-filtered = selected(selected.d_loc1 == '강원' & selected.d_PM10 >= 0 :);
+%% variable name setting
+t3 = renamevars(t3, ["Var1", "Var2", "Var3", "Var4", "Var5", "Var6", "Var7"], ...
+                ["loc1", "loc2", "loc3", "station", "TMSID", "YYYYMMDDHH", "PM10"]);
+% t3.YYYYMMDDHH = t3.YYYYMMDDHH - 2010000000;
 
-%% plot setting
-% 관측소별 시계열데이터
-% stationNum = ?
-%     station 개수에 따라 subplot을 만들어줘야한다.
+%% plot setting - 관측소별 시계열데이터
 
-% stationName 별로 string arrary 만들어주기
+% station 개수에 따라 subplot을 만들어줘야한다.
+stationID = unique(t3.TMSID);
+stationNum = height(stationID);
 
 f = figure('Name', 'PM10 of Gangwon-do Province', ...
-       'NumberTitle', 'off');
+           'NumberTitle', 'off');
 f.Position(3:4) = [900, 750];
 set(gcf, 'Color', [1, 1, 1]);
 
 i = 1;
 while (i <= stationNum)
     % plot setting
-    subplot(3, 4, i);  % 개수 정해놔야함
+    subplot(3, 2, i);  % 개수 정해놔야함
     hold on;
     box on;
-    xlabel('Date')
+    xlabel('Time')
     ylabel('PM10')
-%     title(stationName{i})
-%     plot(filtered(filtered.d_mon == i, :), ...
-%         "d_yr", "d_alk", ...
-%         'Color', [1, 0, 0], ...
-%         'LineWidth', 1);
-%     scatter(filtered(filtered.d_mon == i, :), ...
-%         "d_yr", "d_alk", ...
-%         'MarkerEdgeColor', [1, 0, 0], ...
-%         'LineWidth', 1);
+    title(['TMSID: ', num2str(stationID(i))]);
+    sub = find(t3.TMSID == stationID(i));
+    plot(t3.YYYYMMDDHH(sub), t3.PM10(sub), ...
+         'red-', 'LineWidth', 1);
     i = i + 1;
 end
 
