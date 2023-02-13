@@ -21,67 +21,48 @@ timeR = [max(socat.yearMin, som_ffn.yearMin),
 setting = getYear(timeR, socat);
 
 %%
-f = figure('Name', "yearly comparison of SOM-FFN and SOCAT", ...
+f1 = figure('Name', "yearly comparison of SOM-FFN and SOCAT", ...
            'NumberTitle', 'off');
-f.Position(3:4) = [1200, 400];
+f1.Position(3:4) = [1200, 600];
 hold on;
 
+%%
 dataSOCAT = getSOCAT(setting, socat);
 dataSOMFFN = getSOMFFN(setting, som_ffn);
 dataDiff1 = getDiff2(dataSOMFFN, dataSOCAT);
 
 setting.yearStr = num2str(setting.startYear) + " ~ " + num2str(setting.endYear);
 
-% sub = subplot(1, 3, 1);
-% drawMap(dataSOMFFN, som_ffn, sub, "SOMFFN");
-% title(setting.yearStr + " SOM-FFN");
+sub = subplot(2, 3, 1);
+drawMap(dataSOMFFN, som_ffn, sub, "SOMFFN");
+title(setting.yearStr + " SOM-FFN");
 
-% sub = subplot(1, 3, 2);
-% drawMap(dataSOCAT, socat, sub, "SOCAT");
-% title(setting.yearStr + " SOCAT");
+sub = subplot(2, 3, 2);
+drawMap(dataSOCAT, socat, sub, "SOCAT");
+title(setting.yearStr + " SOCAT");
 
-% sub = subplot(1, 3, 3);
-% drawMap(dataDiff1, socat, sub, "diff");
-% title("difference");
+sub = subplot(2, 3, 3);
+drawMap(dataDiff1, socat, sub, "diff");
+title("difference");
 
+%%
 res = parseDiff(setting, dataDiff1);
-diff = reshape(dataDiff1, [], 1);
-diffLat = zeros(360 * 180, 1);
-i = 1;
-cnt = 1;
-while i <= 180
-    j = 1;
-    while j <=360
-        diffLat(cnt, 1) = i;
-        j = j + 1;
-        cnt = cnt + 1;
-    end
-    i = i + 1;
-end
-diffLon = zeros(360 * 180, 1);
-i = 1;
-cnt = 1;
-while i <= 180
-    j = 1;
-    while j <=360
-        diffLon(cnt, 1) = j;
-        j = j + 1;
-        cnt = cnt + 1;
-    end
-    i = i + 1;
-end
-dataDiff2 = table(diffLat, diffLon, diff);
-sig = find(dataDiff2.diff ~= -999);
-dataDiff3 = dataDiff2(sig, :);
-dataDiff3 = renamevars(dataDiff3, ["diffLat", "diffLon", "diff"], ...
-                                  ["lat", "lon", "diff"]);
-res.data = dataDiff3;
-histogram(res.data.diff);
-title(setting.yearStr + " SOCAT-NN difference");
+res = getDiffTable(dataDiff1, res);
+
+sub = subplot(2, 3, 4:5);
+drawHistogram(res, setting);
+
+res = filterDiff(res);
+dataDiff2 = dataDiff1;
+sig = find(dataDiff2 >= res.rangeMin & dataDiff2 <= res.rangeMax);
+dataDiff2(sig) = -999;
+sub = subplot(2, 3, 6);
+drawMap(dataDiff2, socat, sub, "diff");
+title("filtered difference");
 
 %% ============================= functions (1) =============================
 function setting = getYear(timeR, socat)
-    disp("< enter the year between 1982 ~ 2020");
+    disp("< enter the year between 1995 ~ 2020");
     startYear = input("> begin: ");
     while (startYear < timeR(1) || startYear > timeR(2))
         disp("< wrong input. try again.");
@@ -198,8 +179,36 @@ function res = parseDiff(setting, dataDiff1)
     disp("=========================================");
 end
 
-function dataDiff2 = getDiffTable(dataDiff1)
-    tmp = reshape(dataDiff1, 1, []);
+function res = getDiffTable(dataDiff1, res)
+    diff = reshape(dataDiff1, [], 1);
+    diffLat = zeros(360 * 180, 1);
+    diffLon = zeros(360 * 180, 1);
+    i = 1;
+    cnt = 1;
+    while i <= 180
+        j = 1;
+        while j <=360
+            diffLat(cnt, 1) = i;
+            diffLon(cnt, 1) = j;
+            j = j + 1;
+            cnt = cnt + 1;
+        end
+        i = i + 1;
+    end
+
+    dataDiff2 = table(diffLat, diffLon, diff);
+    sig = find(dataDiff2.diff ~= -999);
+    dataDiff3 = dataDiff2(sig, :);
+    dataDiff3 = renamevars(dataDiff3, ["diffLat", "diffLon", "diff"], ...
+                                    ["lat", "lon", "diff"]);
+    res.data = dataDiff3;
+end
+
+function res = filterDiff(res)
+    res.rangeMin = input("> diff min: ");
+    res.rangeMax = input("> diff max: ");
+    sig = find(res.data.diff <= res.rangeMin | res.data.diff >= res.rangeMax);
+    res.filtered = res.data(sig, :);
 end
 
 %% ============================= functions (5) =============================
@@ -229,4 +238,11 @@ function drawMap(data, proj, sub, type)
         clim([300, 450]);    
         set(get(h, 'ylabel'), 'String', 'μatm');
     end
+end
+
+function drawHistogram(res, setting)
+    histogram(res.data.diff);
+    title(setting.yearStr + " NN-SOCAT difference");
+    xlabel("difference value");
+    ylabel("frequency");
 end
